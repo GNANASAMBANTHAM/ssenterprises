@@ -1,0 +1,1619 @@
+<?php
+	session_start();
+	require 'connection.php';
+
+	// Add products into the cart table
+	if (isset($_POST['pid'])) {
+	  $pid = $_POST['pid'];
+	  $pname = $_POST['pname'];
+	  $pprice = $_POST['pprice'];
+	  $pimage = $_POST['pimage'];
+	  $pcode = $_POST['pcode'];
+	  $pqty = $_POST['pqty'];
+	  $total_price = $pprice * $pqty;
+
+	  $stmt = $conn->prepare('SELECT product_code FROM cart WHERE product_code=?');
+	  $stmt->bind_param('s',$pcode);
+	  $stmt->execute();
+	  $res = $stmt->get_result();
+	  $r = $res->fetch_assoc();
+	  $code = $r['product_code'] ?? '';
+
+	  if (!$code) {
+	    $query = $conn->prepare('INSERT INTO cart (product_name,product_price,product_image,qty,total_price,product_code) VALUES (?,?,?,?,?,?)');
+	    $query->bind_param('ssssss',$pname,$pprice,$pimage,$pqty,$total_price,$pcode);
+	    $query->execute();
+
+	    echo '<div class="alert alert-success alert-dismissible mt-2">
+						  <button type="button" class="close" data-dismiss="alert">&times;</button>
+						  <strong>Item added to your cart!</strong>
+						</div>';
+	  } else {
+	    echo '<div class="alert alert-danger alert-dismissible mt-2">
+						  <button type="button" class="close" data-dismiss="alert">&times;</button>
+						  <strong>Item already added to your cart!</strong>
+						</div>';
+	  }
+	}
+
+	// Get no.of items available in the cart table
+	if (isset($_GET['cartItem']) && isset($_GET['cartItem']) == 'cart_item') {
+	  $stmt = $conn->prepare('SELECT * FROM cart');
+	  $stmt->execute();
+	  $stmt->store_result();
+	  $rows = $stmt->num_rows;
+
+	  echo $rows;
+	}
+
+	// Remove single items from cart	
+	if (isset($_GET['remove'])) {
+	  $id = $_GET['remove'];
+
+	  $stmt = $conn->prepare('DELETE FROM cart WHERE id=?');
+	  $stmt->bind_param('i',$id);
+	  $stmt->execute();
+
+	  $_SESSION['showAlert'] = 'block';
+	  $_SESSION['message'] = 'Item removed from the cart!';
+	  header('location:cart.php');
+	}
+
+	// Remove all items at once from cart
+	if (isset($_GET['clear'])) {
+	  $stmt = $conn->prepare('DELETE FROM cart');
+	  $stmt->execute();
+	  $_SESSION['showAlert'] = 'block';
+	  $_SESSION['message'] = 'All Item removed from the cart!';
+	  header('location:cart.php');
+	}
+
+	// Set total price of the product in the cart table
+	if (isset($_POST['qty'])) {
+	  $qty = $_POST['qty'];
+	  $pid = $_POST['pid'];
+	  $pprice = $_POST['pprice'];
+
+	  $tprice = $qty * $pprice;
+
+	  $stmt = $conn->prepare('UPDATE cart SET qty=?, total_price=? WHERE id=?');
+	  $stmt->bind_param('isi',$qty,$tprice,$pid);
+	  $stmt->execute();
+	}
+
+	// Checkout and save customer info in the orders table
+	if (isset($_POST['action']) && isset($_POST['action']) == 'order') {
+	  $name = $_POST['name'];
+	  $email = $_POST['email'];
+	  $phone = $_POST['phone'];
+	  $products = $_POST['products'];
+	  $grand_total = $_POST['grand_total'];
+	  $address = $_POST['address'];
+	  $data = '';
+
+	  $stmt = $conn->prepare('INSERT INTO orders (name,email,phone,address,products,amount_paid)VALUES(?,?,?,?,?,?)');
+	  $stmt->bind_param('ssssss',$name,$email,$phone,$address,$products,$grand_total);
+	  $stmt->execute();
+	  $stmt2 = $conn->prepare('DELETE FROM cart');
+	  $stmt2->execute();
+	  $data .= '<div class="text-center">
+								<h1 class="display-4 mt-2 text-danger">Thank You!</h1>
+								<h2 class="text-success">Your Order Placed Successfully!</h2>
+								<h4 class="bg-danger text-light rounded p-2">Items Purchased : ' . $products . '</h4>
+								<h4>Your Name : ' . $name . '</h4>
+								<h4>Your E-mail : ' . $email . '</h4>
+								<h4>Your Phone : ' . $phone . '</h4>
+								<h4>Total Amount Paid : ' . number_format($grand_total,2) . '</h4>
+
+						  </div>';
+	  echo $data;
+	}
+?>
+<?php
+  session_start();
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="description" content="Responsive Bootstrap4 Shop Template, Created by Imran Hossain from https://imransdesign.com/">
+	<!-- title -->
+	<title>SS Enterprises</title>
+
+	<!-- favicon -->
+	<link rel="shortcut icon" type="image/png" href="assets/img/favicon.png">
+	<!-- google font -->
+	<link href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,700" rel="stylesheet">
+	<link href="https://fonts.googleapis.com/css?family=Poppins:400,700&display=swap" rel="stylesheet">
+	<!-- fontawesome -->
+	<link rel="stylesheet" href="assets/css/all.min.css">
+	<!-- bootstrap -->
+	<link rel="stylesheet" href="assets/bootstrap/css/bootstrap.min.css">
+	<!-- owl carousel -->
+	<link rel="stylesheet" href="assets/css/owl.carousel.css">
+	<!-- magnific popup -->
+	<link rel="stylesheet" href="assets/css/magnific-popup.css">
+	<!-- animate css -->
+	<link rel="stylesheet" href="assets/css/animate.css">
+	<!-- mean menu css -->
+	<link rel="stylesheet" href="assets/css/meanmenu.min.css">
+	<!-- main style -->
+	<link rel="stylesheet" href="assets/css/main.css">
+	<!-- responsive -->
+	<link rel="stylesheet" href="assets/css/responsive.css">
+	<style>
+		body{
+			height: auto;
+		}
+		.top-header-area {
+			position: absolute;
+			z-index: 999;
+			width: 100%;
+			padding: 25px 0;
+			background-color: #051922;
+			}
+	</style>
+
+</head>
+<body>
+
+	<!-- header -->
+	<div class="top-header-area" id="sticker">
+		<div class="container">
+			<div class="row">
+				<div class="col-lg-12 col-sm-12 text-center">
+					<div class="main-menu-wrap">
+						<!-- menu start -->
+						<nav class="main-menu">
+							<ul>
+								<li ><a href="index.php">Home</a></li>
+								<li><a href="#product">Products</a></li>
+								<li><a href="#contact">Contact</a></li>
+								<li><a href="index.php">Logout</a></li>
+								<li class="current-list-item"><a href="cart.php"><i class="fas fa-shopping-cart"></i> <span id="cart-item" class="badge badge-danger"></span></a></li>
+								<li><a href=""><i style='font-size:20px' class='fas'>&#xf2bd;</i>&nbsp;&nbsp;
+								<?php
+									require'connection.php';
+									$query = mysqli_query($conn, "SELECT * FROM `logind` WHERE `id`='$_SESSION[id]'");
+									$fetch = mysqli_fetch_array($query);
+									echo "".$fetch['username'];
+								?></a>
+								</li>	 
+							</ul>
+						</nav>
+						<!-- menu end -->
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<!-- end header -->
+	<div class="container">
+      <div class="col-lg-10">
+        <div style="display:<?php if (isset($_SESSION['showAlert'])) {
+			echo $_SESSION['showAlert'];
+			} else {
+			echo 'none';
+			} unset($_SESSION['showAlert']); ?>" class="alert alert-success alert-dismissible mt-3">
+					<button type="button" class="close" data-dismiss="alert">&times;</button>
+					<strong><?php if (isset($_SESSION['message'])) {
+			echo $_SESSION['message'];
+			} unset($_SESSION['showAlert']); ?></strong>
+        </div>
+	  </div>
+	</div>
+	<!-- cart -->
+	<div class="cart-section mt-150 mb-150">
+		<div class="container">
+			<div class="row">
+				<div class="col-lg-12 col-md-12">
+					<div class="cart-table-wrap">
+						<table class="cart-table">
+							<thead class="cart-table-head">
+								<tr class="table-head-row">
+								<th>ID</th>
+								<th>Image</th>
+								<th>Product</th>
+								<th>Price</th>
+								<th>KG	</th>
+								<th>Total Price</th>
+								<th>
+									<a href="action.php?clear=all" class="badge-danger badge p-1" onclick="return confirm('Are you sure want to clear your cart?');"><i class="fas fa-trash"></i>&nbsp;&nbsp;Clear Cart</a>
+								</th>
+								</tr>
+							</thead>
+							<tbody>
+							<?php
+								require 'connection.php';
+								$stmt = $conn->prepare('SELECT * FROM cart');
+								$stmt->execute();
+								$result = $stmt->get_result();
+								$grand_total = 0;
+								while ($row = $result->fetch_assoc()):
+							?>
+								<tr class="table-body-row">
+								<td><?= $row['id'] ?></td>
+								<input type="hidden" class="pid" value="<?= $row['id'] ?>">
+								<td><img src="<?= $row['product_image'] ?>" width="50"></td>
+								<td><?= $row['product_name'] ?></td>
+								<td>
+								<i class="fas fa-rupee-sign"></i>&nbsp;&nbsp;<?= number_format($row['product_price'],2); ?>
+								</td>
+								<input type="hidden" class="pprice" value="<?= $row['product_price'] ?>">
+								<td>
+								&nbsp;&nbsp;&nbsp;<input type="number" class="form-control itemQty" value="<?= $row['qty'] ?>" style="width:75px;">
+								</td>
+								<td><i class="fas fa-rupee-sign"></i>&nbsp;&nbsp;<?= number_format($row['total_price'],2); ?></td>
+								<td>
+								<a href="action.php?remove=<?= $row['id'] ?>" class="text-danger lead" onclick="return confirm('Are you sure want to remove this item?');"><i class="fas fa-trash-alt"></i></a>
+								</td>
+								</tr>
+								<?php $grand_total += $row['total_price']; ?>
+              					<?php endwhile; ?>
+								  <tr>
+									<td colspan="3">
+									<a href="index2.php" class="btn btn-success"><i class="fas fa-cart-plus"></i>&nbsp;&nbsp;Continue
+										Shopping</a>
+									</td>
+									<td colspan="2"><b>Grand Total</b></td>
+									<td><b><i class="fas fa-rupee-sign"></i>&nbsp;&nbsp;<?= number_format($grand_total,2); ?></b></td>
+									<td>
+									<a href="checkout.php" class="btn btn-info <?= ($grand_total > 1) ? '' : 'disabled'; ?>"><i class="far fa-credit-card"></i>&nbsp;&nbsp;Checkout</a>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<!-- end cart -->
+	
+	<!-- copyright -->
+	<div class="copyright">
+		<div class="container">
+			<div class="row">
+				<div class="col-lg-6 col-md-12">
+					<p>Copyrights &copy; SKTstudio 	&nbsp; All Rights Reserved.</p>
+				</div>
+			</div>
+		</div>
+	</div>
+	<!-- end copyright -->
+	
+	<!-- jquery -->
+	<script src="assets/js/jquery-1.11.3.min.js"></script>
+	<!-- bootstrap -->
+	<script src="assets/bootstrap/js/bootstrap.min.js"></script>
+	<!-- count down -->
+	<script src="assets/js/jquery.countdown.js"></script>
+	<!-- isotope -->
+	<script src="assets/js/jquery.isotope-3.0.6.min.js"></script>
+	<!-- waypoints -->
+	<script src="assets/js/waypoints.js"></script>
+	<!-- owl carousel -->
+	<script src="assets/js/owl.carousel.min.js"></script>
+	<!-- magnific popup -->
+	<script src="assets/js/jquery.magnific-popup.min.js"></script>
+	<!-- mean menu -->
+	<script src="assets/js/jquery.meanmenu.min.js"></script>
+	<!-- sticker js -->
+	<script src="assets/js/sticker.js"></script>
+	<!-- main js -->
+	<script src="assets/js/main.js"></script>
+	<script src='https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js'></script>
+  <script src='https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.5.2/js/bootstrap.min.js'></script>
+
+  <script type="text/javascript">
+  $(document).ready(function() {
+
+    // Change the item quantity
+    $(".itemQty").on('change', function() {
+      var $el = $(this).closest('tr');
+
+      var pid = $el.find(".pid").val();
+      var pprice = $el.find(".pprice").val();
+      var qty = $el.find(".itemQty").val();
+      location.reload(true);
+      $.ajax({
+        url: 'action.php',
+        method: 'post',
+        cache: false,
+        data: {
+          qty: qty,
+          pid: pid,
+          pprice: pprice
+        },
+        success: function(response) {
+          console.log(response);
+        }
+      });
+    });
+
+    // Load total no.of items added in the cart and display in the navbar
+    load_cart_item_number();
+
+    function load_cart_item_number() {
+      $.ajax({
+        url: 'action.php',
+        method: 'get',
+        data: {
+          cartItem: "cart_item"
+        },
+        success: function(response) {
+          $("#cart-item").html(response);
+        }
+      });
+    }
+  });
+  </script>
+
+</body>
+</html>
+<?php
+	require 'connection.php';
+	$grand_total = 0;
+	$allItems = '';
+	$items = [];
+	$sql = "SELECT CONCAT(product_name, '(',qty,')') AS ItemQty, total_price FROM cart";
+	$stmt = $conn->prepare($sql);
+	$stmt->execute();
+	$result = $stmt->get_result();
+	while ($row = $result->fetch_assoc()) {
+	  $grand_total += $row['total_price'];
+	  $items[] = $row['ItemQty'];
+	}
+	$allItems = implode(', ', $items);
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="description" content="Responsive Bootstrap4 Shop Template, Created by Imran Hossain from https://imransdesign.com/">
+
+	<!-- title -->
+	<title>SS Enterprises</title>
+
+	<!-- favicon -->
+	<link rel="shortcut icon" type="image/png" href="assets/img/favicon.png">
+	<!-- google font -->
+	<link href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,700" rel="stylesheet">
+	<link href="https://fonts.googleapis.com/css?family=Poppins:400,700&display=swap" rel="stylesheet">
+	<!-- fontawesome -->
+	<link rel="stylesheet" href="assets/css/all.min.css">
+	<!-- bootstrap -->
+	<link rel="stylesheet" href="assets/bootstrap/css/bootstrap.min.css">
+	<!-- owl carousel -->
+	<link rel="stylesheet" href="assets/css/owl.carousel.css">
+	<!-- magnific popup -->
+	<link rel="stylesheet" href="assets/css/magnific-popup.css">
+	<!-- animate css -->
+	<link rel="stylesheet" href="assets/css/animate.css">
+	<!-- mean menu css -->
+	<link rel="stylesheet" href="assets/css/meanmenu.min.css">
+	<!-- main style -->
+	<link rel="stylesheet" href="assets/css/main.css">
+	<!-- responsive -->
+	<link rel="stylesheet" href="assets/css/responsive.css">
+	<style>
+		body{
+			height: auto;
+		}
+		.top-header-area {
+			position: absolute;
+			z-index: 999;
+			width: 100%;
+			padding: 25px 0;
+			background-color: #051922;
+			}
+	</style>
+</head>
+<body>
+
+<?php
+	session_start();
+	if(!ISSET($_SESSION['id'])){
+		header('location:index2.php');
+	}
+?>
+	<!-- header -->
+	<div class="top-header-area" id="sticker">
+		<div class="container">
+			<div class="row">
+				<div class="col-lg-12 col-sm-12 text-center">
+					<div class="main-menu-wrap">
+						<!-- menu start -->
+						<nav class="main-menu">
+							<ul>
+								<li class="current-list-item"><a href="index.php">Home</a></li>
+								<li><a href="#product">Products</a></li>
+								<li><a href="#contact">Contact</a></li>
+								<li><a href="index.php">Logout</a></li>
+								<li><a href=""><i style='font-size:20px' class='fas'>&#xf2bd;</i>&nbsp;&nbsp;
+								<?php
+									require'connection.php';
+									$query = mysqli_query($conn, "SELECT * FROM `logind` WHERE `id`='$_SESSION[id]'");
+									$fetch = mysqli_fetch_array($query);
+									echo "".$fetch['username'];
+								?></a>
+								</li>	 
+									
+							</ul>
+						</nav>
+						<!-- menu end -->
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<!-- end header -->
+	<!-- check out section -->
+	<div class="checkout-section mt-150 mb-150">
+		<div class="container">
+			<div class="row">
+				<div class="col-lg-8" id="order">
+					<div class="checkout-accordion-wrap">
+						<div class="accordion" id="accordionExample">
+						  <div class="card single-accordion">
+						    <div class="card-header" id="headingOne">
+						      <h5 class="mb-0">
+						        <button class="btn btn-link" type="button" data-toggle="collapse" data-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
+						          Billing Address
+						        </button>
+						      </h5>
+						    </div>
+
+						    <div id="collapseOne" class="collapse show" aria-labelledby="headingOne" data-parent="#accordionExample">
+						      <div class="card-body">
+						        <div class="billing-address-form">
+						        <form action="" method="post" id="placeOrder">
+									<input type="hidden" name="products" value="<?= $allItems; ?>">
+          							<input type="hidden" name="grand_total" value="<?= $grand_total; ?>">
+						        		<p><input type="text" name="name" placeholder="Name" required></p>
+						        		<p><input type="email" name="email" placeholder="Email"required></p>
+										<p><input type="tel" name="phone" placeholder="Phone"required></p>
+						        		<p><textarea name="address" id="address" cols="30" rows="10" placeholder="Address"required ></textarea></p>
+										<div class="form-group">
+											<input type="submit" name="submit" value="Place Order">
+										</div>
+								</form>
+					
+						        </div>
+						      </div>
+						    </div>
+						  </div>
+						  <br><br>
+						</div>
+					</div>
+				</div>
+				
+
+				<div class="col-lg-4">
+					<div class="order-details-wrap">
+					<h6 class="lead"><b>Product(s) : 
+					</b><br><br><?= $allItems; ?></h6>
+					<h6 class="lead"><b>Delivery Charge : </b>Free</h6>
+					<h5><b>Total Amount Payable : 
+					</b><?= number_format($grand_total,2) ?>/-</h5>
+						<!-- <a href="#" class="boxed-btn">Place Order</a> -->
+							
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<!-- end check out section -->
+	
+	<!-- copyright -->
+	<div class="copyright">
+		<div class="container">
+			<div class="row">
+				<div class="col-lg-6 col-md-12">
+					<p>Copyrights &copy; SKTstudio 	&nbsp; All Rights Reserved.</p>
+				</div>
+			</div>
+		</div>
+	</div>
+	<!-- end copyright -->
+	
+	<!-- jquery -->
+	<script src="assets/js/jquery-1.11.3.min.js"></script>
+	<!-- bootstrap -->
+	<script src="assets/bootstrap/js/bootstrap.min.js"></script>
+	<!-- count down -->
+	<script src="assets/js/jquery.countdown.js"></script>
+	<!-- isotope -->
+	<script src="assets/js/jquery.isotope-3.0.6.min.js"></script>
+	<!-- waypoints -->
+	<script src="assets/js/waypoints.js"></script>
+	<!-- owl carousel -->
+	<script src="assets/js/owl.carousel.min.js"></script>
+	<!-- magnific popup -->
+	<script src="assets/js/jquery.magnific-popup.min.js"></script>
+	<!-- mean menu -->
+	<script src="assets/js/jquery.meanmenu.min.js"></script>
+	<!-- sticker js -->
+	<script src="assets/js/sticker.js"></script>
+	<!-- main js -->
+	<script src="assets/js/main.js"></script>
+	<script type="text/javascript">
+  $(document).ready(function() {
+
+    // Sending Form data to the server
+    $("#placeOrder").submit(function(e) {
+      e.preventDefault();
+      $.ajax({
+        url: 'action.php',
+        method: 'post',
+        data: $('form').serialize() + "&action=order",
+        success: function(response) {
+          $("#order").html(response);
+        }
+      });
+    });
+
+    // Load total no.of items added in the cart and display in the navbar
+    load_cart_item_number();
+
+    function load_cart_item_number() {
+      $.ajax({
+        url: 'action.php',
+        method: 'get',
+        data: {
+          cartItem: "cart_item"
+        },
+        success: function(response) {
+          $("#cart-item").html(response);
+        }
+      });
+    }
+  });
+  </script>
+
+</body>
+</html>
+<?php 
+        $servername = "localhost";
+        $username = "root";
+        $password = "";
+        $db = "sss";
+        $port= 3308;
+        $conn = mysqli_connect($servername,$username,$password,$db,$port);
+        if(!$conn)
+       {	
+        die('connecion failed'.mysqli_connect_error());
+       }
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="description" content="Responsive Bootstrap4 Shop Template, Created by Imran Hossain from https://imransdesign.com/">
+
+	<!-- title -->
+	<title>SS Enterprises</title>
+
+	<!-- favicon -->
+	<link rel="shortcut icon" type="image/png" href="assets/img/favicon.png">
+	<!-- google font -->
+	<link href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,700" rel="stylesheet">
+	<link href="https://fonts.googleapis.com/css?family=Poppins:400,700&display=swap" rel="stylesheet">
+	<!-- fontawesome -->
+	<link rel="stylesheet" href="assets/css/all.min.css">
+	<!-- bootstrap -->
+	<link rel="stylesheet" href="assets/bootstrap/css/bootstrap.min.css">
+	<!-- owl carousel -->
+	<link rel="stylesheet" href="assets/css/owl.carousel.css">
+	<!-- magnific popup -->
+	<link rel="stylesheet" href="assets/css/magnific-popup.css">
+	<!-- animate css -->
+	<link rel="stylesheet" href="assets/css/animate.css">
+	<!-- mean menu css -->
+	<link rel="stylesheet" href="assets/css/meanmenu.min.css">
+	<!-- main style -->
+	<link rel="stylesheet" href="assets/css/main.css">
+	<!-- responsive -->
+	<link rel="stylesheet" href="assets/css/responsive.css">
+
+</head>
+<body>
+
+	<!-- header -->
+	<div class="top-header-area" id="sticker" class="fixed-top d-flex align-items-center header-transparent">
+		<div class="container">
+			<div class="row">
+				<div class="col-lg-12 col-sm-12 text-center">
+					<div class="main-menu-wrap">
+						<!-- menu start -->
+						<nav class="main-menu">
+							<ul>
+								<li class="current-list-item"><a href="index.php">Home</a></li>
+								<li><a href="#product">Products</a></li>
+								<li><a href="#contact">Contact</a></li>
+								<li><a href="login.php">Login / Signup</a></li> 
+								<li></li>		
+							</ul>
+							<i class="bi bi-list mobile-nav-toggle"></i>
+						</nav>
+						<!-- menu end -->
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<!-- end header -->
+	<!-- hero area -->
+	<div class="hero-area hero-bg">
+		<div class="container">
+			<div class="row">
+				<div class="col-lg-9 offset-lg-2 text-center">
+					<div class="hero-text">
+						<div class="hero-text-tablecell">
+							<p class="subtitle">" Empowering Solutions Empowering Success "</p>
+							<h1>Siva Shakthi Enterprises</h1>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<!-- end hero area -->
+	<!-- features list section -->
+	<div class="list-section pt-80 pb-80">
+		<div class="container">
+			<div class="row">
+				<div class="col-lg-4 col-md-6 mb-4 mb-lg-0">
+					<div class="list-box d-flex align-items-center">
+						<div class="list-icon">
+							<i class="fas fa-shipping-fast"></i>
+						</div>
+						<div class="content">
+							<h3>Free Shipping</h3>
+							<p>When order over $75</p>
+						</div>
+					</div>
+				</div>
+				<div class="col-lg-4 col-md-6 mb-4 mb-lg-0">
+					<div class="list-box d-flex align-items-center">
+						<div class="list-icon">
+							<i class="fas fa-phone-volume"></i>
+						</div>
+						<div class="content">
+							<h3>24/7 Support</h3>
+							<p>Get support all day</p>
+						</div>
+					</div>
+				</div>
+				<div class="col-lg-4 col-md-6">
+					<div class="list-box d-flex justify-content-start align-items-center">
+						<div class="list-icon">
+							<i class="fas fa-sync"></i>
+						</div>
+						<div class="content">
+							<h3>Refund</h3>
+							<p>Get refund within 3 days!</p>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<!-- end features list section -->
+	<!-- products -->
+	<a id="product"></a>
+	<div class="product-section mt-150 mb-150">
+		<div class="container">
+
+			<div class="row">
+                <div class="col-md-12">
+                    <div class="product-filters">
+                        <ul>
+                            <li class="active" data-filter="*">All</li>
+                            <li data-filter=".strawberry">Cotton Waste</li>
+                            <li data-filter=".berry">Rayon Waste</li>
+                            <li data-filter=".lemon">Vest Waste</li>
+							<li data-filter=".yarn">Cotton Yarn</li>
+                        </ul>
+						<i class="bi bi-list mobile-nav-toggle"></i>
+                    </div>
+                </div>
+            </div>
+			<div class="row mt-2 pb-3">
+		<?php
+				include 'connection.php';
+				$stmt = $conn->prepare('SELECT * FROM product');
+				$stmt->execute();
+				$result = $stmt->get_result();
+				while ($row = $result->fetch_assoc()):
+			?>
+		<div class="col-sm-6 col-md-4 col-lg-3 mb-2">
+			<div class="card-deck">
+			<div class="card p-2 mb-2">
+			
+				<img src="<?= $row['product_image'] ?>" class="card-img-top" height="250">
+			
+				<div class="card-body p-1">
+				<h4 class="card-title text-center" style="color:#f28123"><?= $row['product_name'] ?></h4>
+				<br>
+				<h5 class="card-text text-center"><i class="fas fa-rupee-sign"></i>&nbsp;&nbsp;<?= number_format($row['product_price'],2) ?>/-</h5>
+				<br>
+				</div>
+				<div class="card-footer p-1">
+				<form action="" class="form-submit">
+					<div class="row p-2">
+					<div class="col-md-6 py-1 pl-4">
+						<b>KG :</b>
+					</div>
+					<div class="col-md-6">
+						<input type="number" class="form-control pqty" value="<?= $row['product_qty'] ?>">
+					</div>
+					</div>
+					<input type="hidden" class="pid" value="<?= $row['id'] ?>">
+					<input type="hidden" class="pname" value="<?= $row['product_name'] ?>">
+					<input type="hidden" class="pprice" value="<?= $row['product_price'] ?>">
+					<input type="hidden" class="pimage" value="<?= $row['product_image'] ?>">
+					<input type="hidden" class="pcode" value="<?= $row['product_code'] ?>">
+					<a href="login.php" class="cart-btn addItemBtn"><i class="fas fa-shopping-cart"></i> Add to Cart</a>
+					<br>
+					<br>
+					
+				</form>
+				</div>
+			</div>
+			</div>
+		</div>
+		<?php endwhile; ?>
+		</div>
+		</div>
+	</div>
+	<!-- end products -->
+
+	<!-- contact form -->
+	<a id="contact"></a>
+	<div class="contact-from-section mt-150 mb-150">
+		<div class="container">
+			<div class="row">
+				<div class="col-lg-50 ">	
+						<div class="contact-form-wrap">
+								<div class="container">
+									<div class="row">
+										<div class="col-lg-10 col-md-12">
+											<div class="abt-text">
+												<p class="top-sub">Since Year 1997</p>
+												<h2>We are <span class="orange-text">SS Enterprises</span></h2>
+												<p>Exporting our goods to multi area </p>
+												<p>Like Manglore , Mumbai , Delhi ....</p>
+												<a href="about.php" class="boxed-btn mt-4">know more</a>
+												<br>
+										<br>
+										<br><br>
+											</div>
+										</div>
+										
+										<div class="contact-form-box">
+											<h4>Shop Address</h4>
+											<p>152 Muthusamy Street<br> kottai <br> Erode-1</p>
+										</div>
+										<div class="contact-form-box">
+											<h4> Shop Hours</h4>
+											<p>MON - FRIDAY: 8 to 9 PM <br> SAT - SUN: 10 to 8 PM </p>
+										</div>
+										<div class="contact-form-box">
+											<h4> Contact</h4>
+											<p>Phone: +91 9345852636 <br> Email: ssenterprises@gmail.com</p>
+										</div>
+									</div>
+								</div>
+						</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	
+	<!-- end contact form -->
+	
+	<!-- copyright -->
+	<div class="copyright">
+		<div class="container">
+			<div class="row">
+				<div class="col-lg-6 col-md-12">
+					<p>Copyrights &copy; SKTstudio 	&nbsp; All Rights Reserved.</p>
+				</div>
+				<!-- <div class="col-lg-6 text-right col-md-12">
+					<div class="social-icons">
+						<ul>
+							<li><a href="#" target="_blank"><i class="fab fa-facebook-f"></i></a></li>
+							<li><a href="#" target="_blank"><i class="fab fa-twitter"></i></a></li>
+							<li><a href="#" target="_blank"><i class="fab fa-instagram"></i></a></li>
+							<li><a href="#" target="_blank"><i class="fab fa-linkedin"></i></a></li>
+							<li><a href="#" target="_blank"><i class="fab fa-dribbble"></i></a></li>
+						</ul>
+					</div>
+				</div> -->
+			</div>
+		</div>
+	</div>
+	<!-- end copyright -->
+	
+	<!-- jquery -->
+	<script src="assets/js/jquery-1.11.3.min.js"></script>
+	<!-- bootstrap -->
+	<script src="assets/bootstrap/js/bootstrap.min.js"></script>
+	<!-- count down -->
+	<script src="assets/js/jquery.countdown.js"></script>
+	<!-- isotope -->
+	<script src="assets/js/jquery.isotope-3.0.6.min.js"></script>
+	<!-- waypoints -->
+	<script src="assets/js/waypoints.js"></script>
+	<!-- owl carousel -->
+	<script src="assets/js/owl.carousel.min.js"></script>
+	<!-- magnific popup -->
+	<script src="assets/js/jquery.magnific-popup.min.js"></script>
+	<!-- mean menu -->
+	<script src="assets/js/jquery.meanmenu.min.js"></script>
+	<!-- sticker js -->
+	<script src="assets/js/sticker.js"></script>
+	<!-- main js -->
+	<script src="assets/js/main.js"></script>
+
+</body>
+</html>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+
+	<!-- title -->
+	<title>SS Enterprises</title>
+
+	<!-- favicon -->
+	<link rel="shortcut icon" type="image/png" href="assets/img/favicon.png">
+	<!-- google font -->
+	<link href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,700" rel="stylesheet">
+	<link href="https://fonts.googleapis.com/css?family=Poppins:400,700&display=swap" rel="stylesheet">
+	<!-- fontawesome -->
+	<link rel="stylesheet" href="assets/css/all.min.css">
+	<!-- bootstrap -->
+	<link rel="stylesheet" href="assets/bootstrap/css/bootstrap.min.css">
+	<!-- owl carousel -->
+	<link rel="stylesheet" href="assets/css/owl.carousel.css">
+	<!-- magnific popup -->
+	<link rel="stylesheet" href="assets/css/magnific-popup.css">
+	<!-- animate css -->
+	<link rel="stylesheet" href="assets/css/animate.css">
+	<!-- mean menu css -->
+	<link rel="stylesheet" href="assets/css/meanmenu.min.css">
+	<!-- main style -->
+	<link rel="stylesheet" href="assets/css/main.css">
+	<!-- responsive -->
+	<link rel="stylesheet" href="assets/css/responsive.css">
+
+</head>
+<body>
+
+<?php
+	session_start();
+	if(!ISSET($_SESSION['id'])){
+		header('location:index2.php');
+	}
+?>
+	<!-- header -->
+	<div class="top-header-area" id="sticker">
+		<div class="container">
+			<div class="row">
+				<div class="col-lg-12 col-sm-12 text-center">
+					<div class="main-menu-wrap">
+						<!-- menu start -->
+						<nav class="main-menu">
+							<ul>
+								<li><a href="index.php">Home</a></li>
+								<li><a href="#product">Products</a></li>
+								<li><a href="#contact">Contact</a></li>
+								<li><a href="index.php">Logout</a></li>
+                                <li><a href="cart.php"><i class="fas fa-shopping-cart"></i> <span id="cart-item" class="badge badge-danger"></span></a></li>
+								<li class="current-list-item"><a href=""><i style='font-size:20px' class='fas'>&#xf2bd;</i>&nbsp;&nbsp;
+								<?php
+									require'connection.php';
+									$query = mysqli_query($conn, "SELECT * FROM `logind` WHERE `id`='$_SESSION[id]'");
+									$fetch = mysqli_fetch_array($query);
+									echo "".$fetch['username'];
+								?></a>
+								</li>	 
+									
+							</ul>
+						</nav>
+						<!-- menu end -->
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<!-- end header -->
+	<!-- hero area -->
+	<div class="hero-area hero-bg">
+		<div class="container">
+			<div class="row">
+				<div class="col-lg-9 offset-lg-2 text-center">
+					<div class="hero-text">
+						<div class="hero-text-tablecell">
+							<p class="subtitle">" Empowering Solutions Empowering Success "</p>
+							<h1>Siva Shakthi Enterprises</h1>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<!-- end hero area -->
+	<!-- features list section -->
+	<div class="list-section pt-80 pb-80">
+		<div class="container">
+			<div class="row">
+				<div class="col-lg-4 col-md-6 mb-4 mb-lg-0">
+					<div class="list-box d-flex align-items-center">
+						<div class="list-icon">
+							<i class="fas fa-shipping-fast"></i>
+						</div>
+						<div class="content">
+							<h3>Free Shipping</h3>
+							<p>When order over $75</p>
+						</div>
+					</div>
+				</div>
+				<div class="col-lg-4 col-md-6 mb-4 mb-lg-0">
+					<div class="list-box d-flex align-items-center">
+						<div class="list-icon">
+							<i class="fas fa-phone-volume"></i>
+						</div>
+						<div class="content">
+							<h3>24/7 Support</h3>
+							<p>Get support all day</p>
+						</div>
+					</div>
+				</div>
+				<div class="col-lg-4 col-md-6">
+					<div class="list-box d-flex justify-content-start align-items-center">
+						<div class="list-icon">
+							<i class="fas fa-sync"></i>
+						</div>
+						<div class="content">
+							<h3>Refund</h3>
+							<p>Get refund within 3 days!</p>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<!-- end features list section -->
+	<!-- products -->
+	<a id="product"></a>
+	<div class="row">
+                <div class="col-md-12">
+                    <div class="product-filters">
+                        <ul>
+                            
+                            <li>Cotton Waste</li>
+                            <li>Rayon Waste</li>
+                            <li>Vest Waste</li>
+							<li>Cotton Yarn</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+    <div class="container">
+		<div id="message">
+		</div>
+		<div class="row mt-2 pb-3">
+		<?php
+				include 'connection.php';
+				$stmt = $conn->prepare('SELECT * FROM product');
+				$stmt->execute();
+				$result = $stmt->get_result();
+				while ($row = $result->fetch_assoc()):
+			?>
+		<div class="col-sm-6 col-md-4 col-lg-3 mb-2">
+			<div class="card-deck">
+			<div class="card p-2 mb-2">
+			
+				<img src="<?= $row['product_image'] ?>" class="card-img-top" height="250">
+			
+				<div class="card-body p-1">
+				<h4 class="card-title text-center" style="color:#f28123"><?= $row['product_name'] ?></h4>
+				<br>
+				<h5 class="card-text text-center"><i class="fas fa-rupee-sign"></i>&nbsp;&nbsp;<?= number_format($row['product_price'],2) ?>/-</h5>
+				<br>
+				</div>
+				<div class="card-footer p-1">
+				<form action="" class="form-submit">
+					<div class="row p-2">
+					<div class="col-md-6 py-1 pl-4">
+						<b>KG: </b>
+					</div>
+					<div class="col-md-6">
+						<input type="number" class="form-control pqty" value="<?= $row['product_qty'] ?>">
+					</div>
+					</div>
+					<input type="hidden" class="pid" value="<?= $row['id'] ?>">
+					<input type="hidden" class="pname" value="<?= $row['product_name'] ?>">
+					<input type="hidden" class="pprice" value="<?= $row['product_price'] ?>">
+					<input type="hidden" class="pimage" value="<?= $row['product_image'] ?>">
+					<input type="hidden" class="pcode" value="<?= $row['product_code'] ?>">
+					<a href="cart.php" class="cart-btn addItemBtn"><i class="fas fa-shopping-cart"></i> Add to Cart</a>
+					<br>
+					<br>
+					
+				</form>
+				</div>
+			</div>
+			</div>
+		</div>
+		<?php endwhile; ?>
+		</div>
+  	</div>
+	<!-- contact form -->
+	<a id="contact"></a>
+	<div class="contact-from-section mt-150 mb-150">
+		<div class="container">
+			<div class="row">
+				<div class="col-lg-50 ">	
+						<div class="contact-form-wrap">
+								<div class="container">
+									<div class="row">
+										<div class="col-lg-10 col-md-12">
+											<div class="abt-text">
+											<p class="top-sub">Since Year 1997</p>
+												<h2>We are <span class="orange-text">SS Enterprises</span></h2>
+												<p>Exporting our goods to multi area </p>
+												<p>Like Manglore , Mumbai , Delhi ....</p>
+												<a href="about.php" class="boxed-btn mt-4">know more</a>
+												<br>
+										<br>
+										<br><br>
+											</div>
+										</div>
+										
+										<div class="contact-form-box">
+											<h4>Shop Address</h4>
+											<p>34/8, East Hukupara <br> Gifirtok, Sadan. <br> Country Name</p>
+										</div>
+										<div class="contact-form-box">
+											<h4> Shop Hours</h4>
+											<p>MON - FRIDAY: 8 to 9 PM <br> SAT - SUN: 10 to 8 PM </p>
+										</div>
+										<div class="contact-form-box">
+											<h4> Contact</h4>
+											<p>Phone: +00 111 222 3333 <br> Email: support@fruitkha.com</p>
+										</div>
+									</div>
+								</div>
+						</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	
+	<!-- end contact form -->
+	
+	<!-- copyright -->
+	<div class="copyright">
+		<div class="container">
+			<div class="row">
+				<div class="col-lg-6 col-md-12">
+					<p>Copyrights &copy; SKTstudio 	&nbsp; All Rights Reserved.</p>
+				</div>
+			</div>
+		</div>
+	</div>
+	<!-- end copyright -->
+	
+	<!-- jquery -->
+	<script src="assets/js/jquery-1.11.3.min.js"></script>
+	<!-- bootstrap -->
+	<script src="assets/bootstrap/js/bootstrap.min.js"></script>
+	<!-- count down -->
+	<script src="assets/js/jquery.countdown.js"></script>
+	<!-- isotope -->
+	<script src="assets/js/jquery.isotope-3.0.6.min.js"></script>
+	<!-- waypoints -->
+	<script src="assets/js/waypoints.js"></script>
+	<!-- owl carousel -->
+	<script src="assets/js/owl.carousel.min.js"></script>
+	<!-- magnific popup -->
+	<script src="assets/js/jquery.magnific-popup.min.js"></script>
+	<!-- mean menu -->
+	<script src="assets/js/jquery.meanmenu.min.js"></script>
+	<!-- sticker js -->
+	<script src="assets/js/sticker.js"></script>
+	<!-- main js -->
+	<script src="assets/js/main.js"></script>
+
+    <script type="text/javascript">
+  $(document).ready(function() {
+
+    // Send product details in the server
+    $(".addItemBtn").click(function(e) {
+      e.preventDefault();
+      var $form = $(this).closest(".form-submit");
+      var pid = $form.find(".pid").val();
+      var pname = $form.find(".pname").val();
+      var pprice = $form.find(".pprice").val();
+      var pimage = $form.find(".pimage").val();
+      var pcode = $form.find(".pcode").val();
+      var pqty = $form.find(".pqty").val();
+
+      $.ajax({
+        url: 'action.php',
+        method: 'post',
+        data: {
+          pid: pid,
+          pname: pname,
+          pprice: pprice,
+          pqty: pqty,
+          pimage: pimage,
+          pcode: pcode
+        },
+        success: function(response) {
+          $("#message").html(response);
+          window.scrollTo(0, 0);
+          load_cart_item_number();
+        }
+      });
+    });
+
+    // Load total no.of items added in the cart and display in the navbar
+    load_cart_item_number();
+
+    function load_cart_item_number() {
+      $.ajax({
+        url: 'action.php',
+        method: 'get',
+        data: {
+          cartItem: "cart_item"
+        },
+        success: function(response) {
+          $("#cart-item").html(response);
+        }
+      });
+    }
+  });
+  </script>
+
+</body>
+</html>
+
+<?php include('connection.php');
+if(isset($_POST['submit']))
+{
+		$username = $_POST['username'];
+		$password = $_POST['password'];
+		$phone = $_POST['phone'];
+		$email = $_POST['email'];
+		$sql = "INSERT INTO `logind`(`id`,`username`,`password`, `phone`,`email`) VALUES (NULL,'$username','$password','$phone','$email')";
+			if(mysqli_query($conn, $sql)){
+			echo "<script>alert('Successfully Submitted!'); window.location.href='login.php';</script>";}
+			else
+			{
+			echo "ERROR: Hush! Sorry" .$sql. " 
+			". mysqli_error($conn);
+			}
+		// Close connection
+		mysqli_close($conn);
+	}
+?>
+
+body{
+	margin:0;
+	color:#f28123;
+	background:#fff;
+	font:600 16px/18px 'Open Sans',sans-serif;
+}
+*,:after,:before{box-sizing:border-box}
+.clearfix:after,.clearfix:before{content:'';display:table}
+.clearfix:after{clear:both;display:block}
+a{color:inherit;text-decoration:none}
+
+.login-wrap{
+	width:100%;
+	margin:auto;
+	max-width:525px;
+	min-height:670px;
+	position:relative;
+	background:url(https://raw.githubusercontent.com/khadkamhn/day-01-login-form/master/img/bg.jpg) no-repeat center;
+	box-shadow:0 12px 15px 0 rgba(0,0,0,.24),0 17px 50px 0 rgba(0,0,0,.19);
+}
+.login-html{
+	width:100%;
+	height:100%;
+	position:absolute;
+	padding:90px 70px 50px 70px;
+	background:#051922;
+}
+.login-html .sign-in-htm,
+.login-html .sign-up-htm{
+	top:0;
+	left:0;
+	right:0;
+	bottom:0;
+	position:absolute;
+	transform:rotateY(180deg);
+	backface-visibility:hidden;
+	transition:all .4s linear;
+}
+.login-html .sign-in,
+.login-html .sign-up,
+.login-form .group .check{
+	display:none;
+}
+.login-html .tab,
+.login-form .group .label,
+.login-form .group .button{
+	text-transform:uppercase;
+}
+.login-html .tab{
+	font-size:22px;
+	margin-right:15px;
+	padding-bottom:5px;
+	margin:0 15px 10px 0;
+	display:inline-block;
+	border-bottom:2px solid transparent;
+}
+.login-html .sign-in:checked + .tab,
+.login-html .sign-up:checked + .tab{
+	color:#fff;
+	border-color:#1161ee;
+}
+.login-form{
+	min-height:345px;
+	position:relative;
+	perspective:1000px;
+	transform-style:preserve-3d;
+}
+.login-form .group{
+	margin-bottom:15px;
+}
+.login-form .group .label,
+.login-form .group .input,
+.login-form .group .button{
+	width:100%;
+	color:#fff;
+	display:block;
+}
+.login-form .group .input,
+.login-form .group .button{
+	border:none;
+	padding:15px 20px;
+	border-radius:25px;
+	background:rgba(255,255,255,.1);
+}
+.login-form .group input[data-type="password"]{
+	text-security:circle;
+	-webkit-text-security:circle;
+}
+.login-form .group .label{
+	color:#aaa;
+	font-size:12px;
+}
+.login-form .group .button{
+	background:#1161ee;
+}
+.login-form .group label .icon{
+	width:15px;
+	height:15px;
+	border-radius:2px;
+	position:relative;
+	display:inline-block;
+	background:rgba(255,255,255,.1);
+}
+.login-form .group label .icon:before,
+.login-form .group label .icon:after{
+	content:'';
+	width:10px;
+	height:2px;
+	background:#fff;
+	position:absolute;
+	transition:all .2s ease-in-out 0s;
+}
+.login-form .group label .icon:before{
+	left:3px;
+	width:5px;
+	bottom:6px;
+	transform:scale(0) rotate(0);
+}
+.login-form .group label .icon:after{
+	top:6px;
+	right:0;
+	transform:scale(0) rotate(0);
+}
+.login-form .group .check:checked + label{
+	color:#fff;
+}
+.login-form .group .check:checked + label .icon{
+	background:#1161ee;
+}
+.login-form .group .check:checked + label .icon:before{
+	transform:scale(1) rotate(45deg);
+}
+.login-form .group .check:checked + label .icon:after{
+	transform:scale(1) rotate(-45deg);
+}
+.login-html .sign-in:checked + .tab + .sign-up + .tab + .login-form .sign-in-htm{
+	transform:rotate(0);
+}
+.login-html .sign-up:checked + .tab + .login-form .sign-up-htm{
+	transform:rotate(0);
+}
+
+.hr{
+	height:2px;
+	margin:60px 0 50px 0;
+	background:rgba(255,255,255,.2);
+}
+.foot-lnk{
+	text-align:center;
+}
+const signUpButton = document.getElementById('signUp');
+const signInButton = document.getElementById('signIn');
+const container = document.getElementById('container');
+
+signUpButton.addEventListener('click', () => {
+    container.classList.add('right-panel-active');
+});
+
+signInButton.addEventListener('click', () => {
+    container.classList.remove('right-panel-active');
+});
+
+<?php include('connection.php'); ?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="description" content="Responsive Bootstrap4 Shop Template, Created by Imran Hossain from https://imransdesign.com/">
+
+	<!-- title -->
+	<title>SS Enterprises</title>
+
+	<!-- favicon -->
+	<link rel="shortcut icon" type="image/png" href="assets/img/favicon.png">
+	<!-- google font -->
+	<link href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,700" rel="stylesheet">
+	<link href="https://fonts.googleapis.com/css?family=Poppins:400,700&display=swap" rel="stylesheet">
+	<!-- fontawesome -->
+	<link rel="stylesheet" href="assets/css/all.min.css">
+	<!-- bootstrap -->
+	<link rel="stylesheet" href="assets/bootstrap/css/bootstrap.min.css">
+	<!-- owl carousel -->
+	<link rel="stylesheet" href="assets/css/owl.carousel.css">
+	<!-- magnific popup -->
+	<link rel="stylesheet" href="assets/css/magnific-popup.css">
+	<!-- animate css -->
+	<link rel="stylesheet" href="assets/css/animate.css">
+	<!-- mean menu css -->
+	<link rel="stylesheet" href="assets/css/meanmenu.min.css">
+	<!-- main style -->
+	<link rel="stylesheet" href="assets/css/main.css">
+	<!-- responsive -->
+	<link rel="stylesheet" href="assets/css/responsive.css">
+    <link rel="stylesheet" href="login.css">
+    <script src="login.js"></script>
+	<style>
+		.top-header-area {
+			position: absolute;
+			z-index: 999;
+			width: 100%;
+			padding: 25px 0;
+			background-color: #051922;
+			}
+	</style>
+</head>
+<body>
+	
+	<!-- header -->
+	<div class="top-header-area" id="sticker">
+		<div class="container">
+			<div class="row">
+				<div class="col-lg-12 col-sm-12 text-center">
+					<div class="main-menu-wrap">
+						<!-- menu start -->
+						<nav class="main-menu">
+							<ul>
+								<li><a href="index.php">Home</a></li>
+								<li><a href="contact.php">Contact</a></li>
+								<li><a href="shop.php">Shop</a></li>
+								<li><a href="login.php">Login / Signup</a></li> 
+								<li></li>		
+							</ul>
+						</nav>
+						<!-- menu end -->
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<!-- end header -->
+	
+	<!-- breadcrumb-section -->
+
+	<!-- end breadcrumb section -->
+
+	<!-- contact form -->
+	<div class="contact-from-section mt-150 mb-150">
+		<div class="container">
+			<div class="row">
+				<div class="col-lg-8 mb-5 mb-lg-20">
+					<div class="col-lg-10">
+                            <div class="login-wrap">
+                                <div class="login-html">
+                                    <div class="col-lg-10">
+                                    <input id="tab-1" type="radio" name="tab" class="sign-in" checked><label for="tab-1" class="tab">Sign In</label>
+                                    <input id="tab-2" type="radio" name="tab" class="sign-up"><label for="tab-2" class="tab">Sign Up</label>
+                                    <div class="login-form">
+                                        <div class="sign-in-htm">
+											<br>
+											<br>
+                                            <form action="logincheck2.php" method="post" onSubmit="return formValidation()">
+                                            <div class="group">
+                                                <label for="user" class="label">Email</label>
+                                                <input id="user" type="text" class="input" name="email">
+                                            </div>
+                                            <div class="group">
+                                                <label for="pass" class="label">Password</label>
+                                                <input id="pass" type="password" class="input" data-type="password" name="password">
+                                            </div>
+                                            <div class="group">
+                                                <input id="check" type="checkbox" class="check" checked>
+                                                <label for="check"><span class="icon"></span> Keep me Signed in</label>
+                                            </div>
+                                            <div class="group">
+                                                <input type="submit" class="button" value="Sign In" name="submit">
+                                            </div>
+                                            <div class="hr"></div>
+                                            <div class="foot-lnk">
+                                                <a href="#forgot">Forgot Password?</a>
+                                            </div>
+											</form>
+                                        </div>
+                                        <div class="sign-up-htm">
+											
+					
+										<form action="insert.php" method="post" onSubmit="return formValidation()">
+                                            <div class="group">
+                                                <label for="user" class="label">Username</label>
+                                                <input id="user" type="text" class="input" name="username">
+                                            </div>
+                                            <div class="group">
+                                                <label for="pass" class="label">Password</label>
+                                                <input id="pass" type="password" class="input" data-type="password" name="password">
+                                            </div>
+                                            <div class="group">
+                                                <label for="pass" class="label">Phone Number</label>
+                                                <input id="pass" type="text" class="input" name="phone">
+                                            </div>
+                                            <div class="group">
+                                                <label for="pass" class="label">Email Address</label>
+                                                <input id="pass" type="email" class="input" name="email">
+                                            </div>
+                                            <div class="group">
+                                                <input type="submit" class="button" value="Sign Up" name="submit">
+                                            </div>
+                                            <div class="hr"></div>
+                                            <div class="foot-lnk">
+                                                <label for="tab-1">Already Member?</a>
+                                            </div>
+										</form>
+                                        </div>
+                                    </div>
+                                </div>
+                                </div>
+                            </div>	
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<!-- end contact form -->
+
+
+	
+	<!-- copyright -->
+	<div class="copyright">
+		<div class="container">
+			<div class="row">
+				<div class="col-lg-6 col-md-12">
+					<p>Copyrights &copy; SKTstudio 	&nbsp; All Rights Reserved.</p>
+						
+				</div> 	
+			</div>
+		</div>
+	</div>
+	<!-- end copyright -->
+	
+	<!-- jquery -->
+	<script src="assets/js/jquery-1.11.3.min.js"></script>
+	<!-- bootstrap -->
+	<script src="assets/bootstrap/js/bootstrap.min.js"></script>
+	<!-- count down -->
+	<script src="assets/js/jquery.countdown.js"></script>
+	<!-- isotope -->
+	<script src="assets/js/jquery.isotope-3.0.6.min.js"></script>
+	<!-- waypoints -->
+	<script src="assets/js/waypoints.js"></script>
+	<!-- owl carousel -->
+	<script src="assets/js/owl.carousel.min.js"></script>
+	<!-- magnific popup -->
+	<script src="assets/js/jquery.magnific-popup.min.js"></script>
+	<!-- mean menu -->
+	<script src="assets/js/jquery.meanmenu.min.js"></script>
+	<!-- sticker js -->
+	<script src="assets/js/sticker.js"></script>
+	<!-- form validation js -->
+	<script src="assets/js/form-validate.js"></script>
+	<!-- main js -->
+	<script src="assets/js/main.js"></script>
+	
+</body>
+</html>
+<?php
+	require_once 'connection.php';
+	session_start();
+	if(ISSET($_POST['submit'])){
+		$email = $_POST['email'];
+		$password = $_POST['password'];
+	
+		$query = mysqli_query($conn, "SELECT * FROM `logind` WHERE `email` = '$email' AND `password` = '$password'");
+		$fetch = mysqli_fetch_array($query);
+		$row = mysqli_num_rows($query);
+		
+		if($row > 0){
+			$_SESSION['id']=$fetch['id'];
+			header('location:index2.php');
+		}else{
+			echo "<script>alert('Invalid username or password')</script>";
+			echo "<script>window.location='login.php'</script>";
+		}
+		
+	}
+
+?>
+<?php
+ include('connection.php');
+// Retrieve data from the database
+$sql = "SELECT * FROM orders";
+$result = mysqli_query($conn, $sql);
+
+// Create an array to hold the data
+$data = array();
+while($row = mysqli_fetch_assoc($result)) {
+  $data[] = $row;
+}
+
+// Convert data to JSON format
+$json = json_encode($data);
+
+// Set content type header to application/json
+header('Content-Type: application/json');
+
+// Output the JSON object
+echo $json;
+
+// Close the connection
+mysqli_close($conn);
+?>
